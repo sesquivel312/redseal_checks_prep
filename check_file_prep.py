@@ -15,9 +15,15 @@ import yaml
 
 import lib
 
-args = lib.get_args()
+args = lib.get_args()  # get command line args
 
-file_list = lib.get_files()
+file_list = lib.get_files(args.source_dir)  # list of the tsv files to process
 
-f = open(args.column-config-file)
-column_defs = yaml.
+column_defs = None
+if args.column_config_file:  # if provided parse column config file to a dict
+    f = open(args.column_config_file)
+    # todo currently not used, future - add ability to specify column names and where to insert them
+    column_defs = yaml.load(f)
+
+for f in file_list:
+    lib.process_tsv_file(f, column_defs=column_defs, output_dir=args.output_dir)
