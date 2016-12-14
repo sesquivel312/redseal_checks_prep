@@ -12,20 +12,54 @@ def get_args():
     """
     p = argparse.ArgumentParser()
     p.add_argument('--source-dir', help='fully qualified directory containing tsv files')
-    p.add_argument('--output-dir', help='fully qualified directory to deposit output files, defaults to --source-dir if provided')
+    p.add_argument('--output-dir', help='fully qualified directory to deposit output files, '
+                                        'defaults to --source-dir if provided')
+    p.add_argument('--device-name', help='name of device to process', default=None)
+    p.add_argument('--reviewer', help='name of person conducting review', default='')
+    p.add_argument('--review-date', help='date to apply to review column in the format: yyyy-mm-dd', default=None)
+    p.add_argument('--ticket-ref', help='service desk ticket number to apply to disposition column', default=None)
     p.add_argument('--column-config-file', help='name of yaml file defining columsn to add', default=None)
 
     return p.parse_args()
 
 
-def get_files(source_dir):
+def get_files(source_dir, device_name):
+    """
+    return the list of files in the source directory
+
+    If device_name is None, return all the files in source_dir.  Otherwise, return only those files
+    associated with device_name.  It is assumed the file names are of the form <devname>--<checktype>.tsv, e.g.
+
+       myfirewall--usage.tsv
+
+    the device name may contain dashes - hence the double dash separator.  The <checktype> is one of the redseal
+    check types
+
+    :param source_dir: (string) path to location of *.tsv check files
+    :param device_name: (string or None) name of device for which to process files or None
+    :return:
+    """
 
     contents = os.listdir(source_dir)
 
-    return [os.path.join(source_dir, item) for item in contents if os.path.isfile(os.path.join(source_dir, item))]
+    if not device_name:
+        return [os.path.join(source_dir, item) for item in contents if os.path.isfile(os.path.join(source_dir, item))]
+    else:
+        return [os.path.join(source_dir, item) for item in contents if os.path.isfile(os.path.join(source_dir, item)) and device_name in item]
 
 
-def process_tsv_file(tsv_file_name, column_defs=None, output_dir=''):
+def get_unique_devices(file_list):
+
+    udevices = set()
+
+    for fname in file_list:
+        devname = fname.split('--')[0]
+        udevices.add(devname)
+
+    return udevices
+
+
+def process_general_tsv_file(tsv_file_name, column_defs=None, output_dir=''):
 
     # todo in future add capability to read in a yaml file defining what columns to add and where to insert them
     # the add columns list includes the location and names of the columns to be inserted in a tuple of the form
@@ -35,8 +69,8 @@ def process_tsv_file(tsv_file_name, column_defs=None, output_dir=''):
 
     # add_columns = [(1,'ew_id'),('+1','ew_reviewer'),('+2','ew_review_date'),('+3','ew_disposition')]
 
-    tmp_file = tempfile.NamedTemporaryFile()
-    tmp_csv = csv.writer(tmp_file)
+    tmp_file = tempfile.TemporaryFile(delete=False)
+    tmp_csv = csv.writer(tmp_file, dialect='excel-tab')
 
     f = open(tsv_file_name,'rb')  # open the passed in file
     csv_src_reader = csv.reader(f, dialect='excel-tab')  # and convert it to a csv reader (tsv here)
@@ -53,18 +87,19 @@ def process_tsv_file(tsv_file_name, column_defs=None, output_dir=''):
 
         if not counter:  # header row
             new_row.extend(row)  # put the existing rows in todo modify to handle arbitrary inserts
-            new_row.insert('ew_id')  # prepend the counter value (it's the ew_id of this row)
-            new_row.append(['ew_reviewer', 'ew_review_date', 'ew_disposition'])
+            new_row.insert(0,'ew_id')  # prepend the counter value (it's the ew_id of this row)
+            new_row.extend(['ew_reviewer', 'ew_review_date', 'ew_disposition'])
         else:
             new_row.extend(row)  #put the existing rows in todo modify to handle arbitrary inserts
-            new_row.insert(counter)  # prepend the counter value (it's the ew_id of this row)
-            new_row.append(['','',''])
+            new_row.insert(0,counter)  # prepend the counter value (it's the ew_id of this row)
+            new_row.extend(['SEsquivel','2016-12-14','Additional Info Required: '])
 
-        tmp_csv.write(new_row)
+        tmp_csv.writerow(new_row)
 
         counter += 1
 
     tmp_file.flush()
-    outfile_name = os.path.split()[1]
-    shutil.copy(tmp_file, os.path.join(output_dir,outfile_name))
+    outfile_name = os.path.split(tsv_file_name)[1]
+    outfile_name = os.path.join(output_dir, outfile_name)
+    shutil.copy(tmp_file.name, outfile_name)
     tmp_file.close()
