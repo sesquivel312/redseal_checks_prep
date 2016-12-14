@@ -10,6 +10,9 @@ options are:
   --output-dir
   --column-config-file
   --device-name
+  --reviewer
+  --review-date
+  --ticket-ref
 """
 
 # todo possibly process unused check files separately - remove packet counter columns & extract unused lines only
@@ -24,13 +27,10 @@ args = lib.get_args()  # get command line args
 
 file_list = lib.get_files(args.source_dir, args.device_name)  # list of the tsv files to process
 
-device_db = lib.get_unique_devices(file_list)
-
 column_defs = None
 if args.column_config_file:  # if provided parse column config file to a dict (doesn't do anything yet)
     f = open(args.column_config_file)
     # todo currently not used, future - add ability to specify column names and where to insert them
     column_defs = yaml.load(f)
 
-for fname in file_list:
-    lib.process_general_tsv_file(fname, column_defs=column_defs, output_dir=args.output_dir)
+lib.process_files(file_list, reviewer=args.reviewer, review_date=args.review_date, ticket_ref=args.ticket_ref)
