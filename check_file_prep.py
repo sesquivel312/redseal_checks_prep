@@ -33,4 +33,6 @@ if args.column_config_file:  # if provided parse column config file to a dict (d
     # todo currently not used, future - add ability to specify column names and where to insert them
     column_defs = yaml.load(f)
 
-lib.process_files(file_list, reviewer=args.reviewer, review_date=args.review_date, ticket_ref=args.ticket_ref)
+for fname in file_list:
+    lib.process_tsv_file(fname, output_dir=args.output_dir, reviewer=args.reviewer, review_date=args.review_date,
+                         ticket_ref=args.ticket_ref)
